@@ -6,7 +6,7 @@ Main application with REST API endpoints and SQLite database.
 import os
 import sqlite3
 from datetime import datetime
-from flask import Flask, request, jsonify, g
+from flask import Flask, request, jsonify, g, send_from_directory
 from flask_cors import CORS
 
 from grading_service import get_full_evaluation, calculate_total, calculate_average, determine_grade, determine_result
@@ -474,8 +474,30 @@ def export_data():
     return jsonify({"students": students, "exported_at": datetime.now().isoformat()})
 
 
+# ========== Static Frontend Serving (for Unified Full-Stack Cloud Deployment) ==========
+
+DIST_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist'))
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    """Serve built React frontend if available; fallback for SPA routing."""
+    if path.startswith('api'):
+        return jsonify({"error": "Endpoint not found"}), 404
+    if path != "" and os.path.exists(os.path.join(DIST_DIR, path)):
+        return send_from_directory(DIST_DIR, path)
+    if os.path.exists(os.path.join(DIST_DIR, 'index.html')):
+        return send_from_directory(DIST_DIR, 'index.html')
+    return jsonify({
+        "message": "8086 SSPES Backend API is live. Build frontend/dist to serve the UI here, or run the React dev server."
+    })
+
+
+# Ensure database is initialized on startup (works with both python app.py and gunicorn)
+init_db()
+
 # ========== Main ==========
 
 if __name__ == '__main__':
-    init_db()
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
